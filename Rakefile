@@ -50,64 +50,45 @@ def in_template task, template
   end
 end
 
-task 'apt' => 'apt.tar.gz'
-task 'yum' => 'yum.tar.gz'
+def create_tasks name, template, &block
+  task name => "#{name}.tar.gz"
 
-file 'yum.tar.gz' => ['yum:deps', 'yum:cache'] do |t|
-  in_template t, YUM do |workdir|
-    system "createrepo --verbose --outputdir '#{workdir}' ."
+  file "#{name}.tar.gz" => ["#{name}:deps", "#{name}:cache"] do |t|
+    in_template t, template, &block
   end
-end
 
-file 'apt.tar.gz' => ['apt:deps', 'apt:cache'] do |t|
-  in_template t, APT do |workdir|
-    APT[:packages].each do |name, (in_url, expected_md5)|
-      filename = File.join workdir, File.basename(in_url)
-      system "reprepro --verbose --basedir '#{workdir}' includedeb go '#{filename}'"
+  namespace name do
+    task 'deps' do
+      sudo "apt-get -y install #{template[:tool]}"
     end
-  end
-end
 
-def create_deps template
-  task 'deps' do
-    sudo "apt-get -y install #{template[:tool]}"
-  end
-end
+    task 'cache' => APT[:packages].map { |k, v| "#{name}:cache:#{k}" }
 
-namespace 'apt' do
-  create_deps APT
+    namespace 'cache' do
+      template[:packages].each_pair do |name, (in_url, expected_md5)|
+        filename = File.basename in_url
 
-  task 'cache' => APT[:packages].map { |k, v| "cache:apt:#{k}" }
-end
+        desc "Download the #{name} package."
+        task name => filename do
+          actual_md5 = Digest::MD5.hexdigest File.read filename
+          raise "MD5(#{filename}) == #{actual_md5} expected #{expected_md5}." unless actual_md5 == expected_md5
+        end
 
-namespace 'yum' do
-  create_deps YUM
-
-  task 'cache' => YUM[:packages].map { |k, v| "cache:yum:#{k}" }
-end
-
-namespace 'cache' do
-  def cache_tasks template
-    template[:packages].each_pair do |name, (in_url, expected_md5)|
-      filename = File.basename in_url
-
-      desc "Download the #{name} package."
-      task name => filename do
-        actual_md5 = Digest::MD5.hexdigest File.read filename
-        raise "MD5(#{filename}) == #{actual_md5} expected #{expected_md5}." unless actual_md5 == expected_md5
-      end
-
-      file filename do
-        File.write filename, open(in_url).read
+        file filename do
+          File.write filename, open(in_url).read
+        end
       end
     end
   end
+end
 
-  namespace 'apt' do
-    cache_tasks APT
-  end
+create_tasks 'yum', YUM do |workdir|
+  system "createrepo --verbose --outputdir '#{workdir}' ."
+end
 
-  namespace 'yum' do
-    cache_tasks YUM
+create_tasks 'apt', APT do |workdir|
+  APT[:packages].each do |name, (in_url, expected_md5)|
+    filename = File.join workdir, File.basename(in_url)
+    system "reprepro --verbose --basedir '#{workdir}' includedeb go '#{filename}'"
   end
 end
