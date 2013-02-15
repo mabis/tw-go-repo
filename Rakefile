@@ -43,6 +43,10 @@ task 'apt' => 'apt.tar.gz' do
   puts 'done?'
 end
 
+task 'yum' => 'yum.tar.gz'
+
+file 'yum.tar.gz' => ['yum:deps', 'yum:cache']
+
 file 'apt.tar.gz' => ['apt:deps', 'apt:cache'] do
   in_template APT do |workdir|
     APT[:packages].each do |name, (in_url, expected_md5)|
@@ -62,6 +66,14 @@ namespace 'apt' do
   end
 
   task 'cache' => APT[:packages].map { |k, v| "cache:apt:#{k}" }
+end
+
+namespace 'yum' do
+  task 'deps' do
+    sudo 'apt-get -y install createrepo'
+  end
+
+  task 'cache' => YUM[:packages].map { |k, v| "cache:yum:#{k}" }
 end
 
 namespace 'cache' do
