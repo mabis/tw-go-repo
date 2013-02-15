@@ -1,5 +1,6 @@
 require 'open-uri'
 require 'digest/md5'
+require 'tmpdir'
 
 APT = {
   directory: 'templates/apt/',
@@ -15,6 +16,43 @@ APT = {
     ]
   }
 }
+
+def sudo command
+  system "sudo -- #{command}"
+end
+
+def in_template template
+  Dir.mktmpdir do |dir|
+    FileUtils.cp_r File.join(template[:directory], '.'), dir
+
+    yield dir
+  end
+end
+
+task 'apt' => 'apt.tar.gz' do
+  puts 'done?'
+end
+
+file 'apt.tar.gz' => ['apt:deps', 'apt:cache'] do
+  in_template APT do |workdir|
+    APT[:packages].each do |name, (in_url, expected_md5)|
+      filename = File.basename in_url
+      outdir = File.join workdir, 'out'
+
+      system "reprepro --verbose --basedir '#{workdir}' --outdir '#{outdir}' includedeb go '#{filename}'"
+
+      system "tar -czf apt.tar.gz -C '#{outdir}' dists pool"
+    end
+  end
+end
+
+namespace 'apt' do
+  task 'deps' do
+    sudo 'apt-get -y install reprepro'
+  end
+
+  task 'cache' => APT[:packages].map { |k, v| "cache:#{k}" }
+end
 
 namespace 'cache' do
   APT[:packages].each_pair do |name, (in_url, expected_md5)|
