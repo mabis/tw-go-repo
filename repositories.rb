@@ -63,7 +63,7 @@ def create_tasks repository
 
   file "#{repository.name}.tar.gz" => ["#{repository.name}:deps", "#{repository.name}:cache"] do |t|
     Dir.mktmpdir do |workdir|
-      FileUtils.cp_r repository.period_directory, workdir
+      FileUtils.cp_r repository.period_directory, workdir if repository[:directory]
 
       repository.packages.each do |package|
         FileUtils.cp package.filename, workdir

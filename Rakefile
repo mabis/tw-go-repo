@@ -24,7 +24,6 @@ repository 'apt' do
 end
 
 repository 'yum' do
-  directory 'templates/yum/'
   outputs %w(*.rpm repodata)
   tool 'createrepo'
 
