@@ -58,10 +58,12 @@ def repository name, &blk
 end
 
 def create_tasks repository
-  desc "Generate #{repository.name} repository archive"
-  task repository.name => "#{repository.name}.tar.gz"
+  archive = "#{repository.name}.tar.gz"
 
-  file "#{repository.name}.tar.gz" => ["#{repository.name}:deps", "#{repository.name}:cache"] do |t|
+  desc "Generate #{repository.name} repository archive"
+  task repository.name => archive
+
+  file archive => ["#{repository.name}:deps", "#{repository.name}:cache"] do |t|
     Dir.mktmpdir do |workdir|
       FileUtils.cp_r repository.period_directory, workdir if repository[:directory]
 
@@ -76,6 +78,18 @@ def create_tasks repository
   end
 
   namespace repository.name do
+    desc "Upload a #{repository.name} repository to an S3 bucket"
+    task 's3', [:bucket] => archive do |t, args|
+      args.with_defaults bucket: 'tw-go-repo.quadhome.com'
+
+      sudo 'apt-get -y install s3cmd'
+
+      Dir.mktmpdir do |workdir|
+        system "tar -zxf '#{archive}' -C '#{workdir}'"
+        system "s3cmd --verbose sync '#{workdir}/' 's3://#{args.bucket}'"
+      end
+    end
+
     desc "Install #{repository.name} packaging tools"
     task 'deps' do
       sudo "apt-get -y install #{repository[:tool]}"
