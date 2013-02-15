@@ -4,6 +4,7 @@ require 'tmpdir'
 
 APT = {
   directory: 'templates/apt/',
+  outputs: ['dists', 'pool'],
   packages: {
     'go-agent' => [
       'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.deb',
@@ -19,6 +20,7 @@ APT = {
 
 YUM = {
   directory: 'templates/yum/',
+  outputs: ['*.rpm', 'repodata'],
   packages: {
     'go-agent' => [
       'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.noarch.rpm',
@@ -31,11 +33,18 @@ def sudo command
   system "sudo -- #{command}"
 end
 
-def in_template template
+def in_template task, template
   Dir.mktmpdir do |dir|
     FileUtils.cp_r File.join(template[:directory], '.'), dir
 
+    template[:packages].each do |name, (in_url, expected_md5)|
+      filename = File.basename in_url
+      FileUtils.cp filename, dir
+    end
+
     yield dir
+
+    system "tar -czf #{task.name} -C '#{dir}' #{template[:outputs].join ' '}"
   end
 end
 
@@ -45,17 +54,17 @@ end
 
 task 'yum' => 'yum.tar.gz'
 
-file 'yum.tar.gz' => ['yum:deps', 'yum:cache']
+file 'yum.tar.gz' => ['yum:deps', 'yum:cache'] do |t|
+  in_template t, YUM do |workdir|
+    system "createrepo --verbose --outputdir '#{workdir}' ."
+  end
+end
 
-file 'apt.tar.gz' => ['apt:deps', 'apt:cache'] do
-  in_template APT do |workdir|
+file 'apt.tar.gz' => ['apt:deps', 'apt:cache'] do |t|
+  in_template t, APT do |workdir|
     APT[:packages].each do |name, (in_url, expected_md5)|
-      filename = File.basename in_url
-      outdir = File.join workdir, 'out'
-
-      system "reprepro --verbose --basedir '#{workdir}' --outdir '#{outdir}' includedeb go '#{filename}'"
-
-      system "tar -czf apt.tar.gz -C '#{outdir}' dists pool"
+      filename = File.join workdir, File.basename(in_url)
+      system "reprepro --verbose --basedir '#{workdir}' includedeb go '#{filename}'"
     end
   end
 end
