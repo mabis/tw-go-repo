@@ -17,10 +17,10 @@ repository 'apt' do
     md5 '209f6cbd4e43bc6633ff15a11a252695'
   end
 
-  package 'go-server' do
-    url 'http://download01.thoughtworks.com/go/12.4.1/ga/go-server-12.4.1-16091.deb'
-    md5 'fa73aae61a640ced96bc818b90df2d15'
-  end
+  # package 'go-server' do
+  #   url 'http://download01.thoughtworks.com/go/12.4.1/ga/go-server-12.4.1-16091.deb'
+  #   md5 'fa73aae61a640ced96bc818b90df2d15'
+  # end
 end
 
 repository 'yum' do
@@ -33,4 +33,9 @@ repository 'yum' do
     url 'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.noarch.rpm'
     md5 'f3cdbf2822940528bd3e42aadfb23f2b'
   end
+
+  # package 'go-server' do
+  #   url 'http://download01.thoughtworks.com/go/12.4.1/ga/go-server-12.4.1-16091.noarch.rpm'
+  #   md5 'ff2afaadef75df65a314fa47df9bd124'
+  # end
 end
