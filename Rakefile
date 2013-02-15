@@ -48,10 +48,7 @@ def in_template task, template
   end
 end
 
-task 'apt' => 'apt.tar.gz' do
-  puts 'done?'
-end
-
+task 'apt' => 'apt.tar.gz'
 task 'yum' => 'yum.tar.gz'
 
 file 'yum.tar.gz' => ['yum:deps', 'yum:cache'] do |t|
