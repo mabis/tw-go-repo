@@ -5,6 +5,7 @@ require 'tmpdir'
 APT = {
   directory: 'templates/apt/',
   outputs: ['dists', 'pool'],
+  tool: 'reprepro',
   packages: {
     'go-agent' => [
       'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.deb',
@@ -21,6 +22,7 @@ APT = {
 YUM = {
   directory: 'templates/yum/',
   outputs: ['*.rpm', 'repodata'],
+  tool: 'createrepo',
   packages: {
     'go-agent' => [
       'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.noarch.rpm',
@@ -66,18 +68,20 @@ file 'apt.tar.gz' => ['apt:deps', 'apt:cache'] do |t|
   end
 end
 
-namespace 'apt' do
+def create_deps template
   task 'deps' do
-    sudo 'apt-get -y install reprepro'
+    sudo "apt-get -y install #{template[:tool]}"
   end
+end
+
+namespace 'apt' do
+  create_deps APT
 
   task 'cache' => APT[:packages].map { |k, v| "cache:apt:#{k}" }
 end
 
 namespace 'yum' do
-  task 'deps' do
-    sudo 'apt-get -y install createrepo'
-  end
+  create_deps YUM
 
   task 'cache' => YUM[:packages].map { |k, v| "cache:yum:#{k}" }
 end
