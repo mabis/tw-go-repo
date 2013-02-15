@@ -1,94 +1,37 @@
-require 'open-uri'
-require 'digest/md5'
-require 'tmpdir'
+require './repositories'
 
-APT = {
-  directory: 'templates/apt/',
-  outputs: ['dists', 'pool'],
-  tool: 'reprepro',
-  packages: {
-    'go-agent' => [
-      'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.deb',
-      '209f6cbd4e43bc6633ff15a11a252695'
-    ],
+repository 'apt' do
+  directory 'templates/apt/'
+  outputs %w(dists pool)
+  tool 'reprepro'
 
-    'go-server' => [
-      'http://download01.thoughtworks.com/go/12.4.1/ga/go-server-12.4.1-16091.deb',
-      'fa73aae61a640ced96bc818b90df2d15'
-    ]
-  }
-}
-
-YUM = {
-  directory: 'templates/yum/',
-  outputs: ['*.rpm', 'repodata'],
-  tool: 'createrepo',
-  packages: {
-    'go-agent' => [
-      'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.noarch.rpm',
-      'f3cdbf2822940528bd3e42aadfb23f2b'
-    ],
-  }
-}
-
-def sudo command
-  system "sudo -- #{command}"
-end
-
-def in_template task, template
-  Dir.mktmpdir do |dir|
-    FileUtils.cp_r File.join(template[:directory], '.'), dir
-
-    template[:packages].each do |name, (in_url, expected_md5)|
-      filename = File.basename in_url
-      FileUtils.cp filename, dir
+  build do |workdir|
+    self[:packages].each do |package|
+      filename = File.join workdir, File.basename(package[:url])
+      system "reprepro --verbose --basedir '#{workdir}' includedeb go '#{filename}'"
     end
+  end
 
-    yield dir
+  package 'go-agent' do
+    url 'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.deb'
+    md5 '209f6cbd4e43bc6633ff15a11a252695'
+  end
 
-    system "tar -czf #{task.name} -C '#{dir}' #{template[:outputs].join ' '}"
+  package 'go-server' do
+    url 'http://download01.thoughtworks.com/go/12.4.1/ga/go-server-12.4.1-16091.deb'
+    md5 'fa73aae61a640ced96bc818b90df2d15'
   end
 end
 
-def create_tasks name, template, &block
-  task name => "#{name}.tar.gz"
+repository 'yum' do
+  directory 'templates/yum/'
+  outputs %w(*.rpm repodata)
+  tool 'createrepo'
 
-  file "#{name}.tar.gz" => ["#{name}:deps", "#{name}:cache"] do |t|
-    in_template t, template, &block
-  end
+  build { |workdir| system "createrepo --verbose --outputdir '#{workdir}' ." }
 
-  namespace name do
-    task 'deps' do
-      sudo "apt-get -y install #{template[:tool]}"
-    end
-
-    task 'cache' => APT[:packages].map { |k, v| "#{name}:cache:#{k}" }
-
-    namespace 'cache' do
-      template[:packages].each_pair do |name, (in_url, expected_md5)|
-        filename = File.basename in_url
-
-        desc "Download the #{name} package."
-        task name => filename do
-          actual_md5 = Digest::MD5.hexdigest File.read filename
-          raise "MD5(#{filename}) == #{actual_md5} expected #{expected_md5}." unless actual_md5 == expected_md5
-        end
-
-        file filename do
-          File.write filename, open(in_url).read
-        end
-      end
-    end
-  end
-end
-
-create_tasks 'yum', YUM do |workdir|
-  system "createrepo --verbose --outputdir '#{workdir}' ."
-end
-
-create_tasks 'apt', APT do |workdir|
-  APT[:packages].each do |name, (in_url, expected_md5)|
-    filename = File.join workdir, File.basename(in_url)
-    system "reprepro --verbose --basedir '#{workdir}' includedeb go '#{filename}'"
+  package 'go-agent' do
+    url 'http://download01.thoughtworks.com/go/12.4.1/ga/go-agent-12.4.1-16091.noarch.rpm'
+    md5 'f3cdbf2822940528bd3e42aadfb23f2b'
   end
 end
