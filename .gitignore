@@ -1,3 +1,5 @@
-/.bundle
-/bin
 .*.swp
+/.bundle
+/.vagrant
+/bin
+Vagrantfile
